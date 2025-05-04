@@ -60,6 +60,28 @@ bucket = os.getenv("BUCKET")
 
 
 
+from botocore.exceptions import ClientError
+
+def create_presigned_url(bucket_name, object_name, expiration=3600):
+    """Generate a presigned URL to share an S3 object
+
+    :param bucket_name: string
+    :param object_name: string
+    :param expiration: Time in seconds for the presigned URL to remain valid
+    :return: Presigned URL as string. If error, returns None.
+    """
+    s3_client = boto3.client('s3')
+    try:
+        response = s3_client.generate_presigned_url('get_object',
+                                                    Params={'Bucket': bucket_name,
+                                                            'Key': object_name},
+                                                    ExpiresIn=expiration)
+    except ClientError as e:
+        logging.error(e)
+        return None
+
+    # The response contains the presigned URL
+    return response
 
 @app.post("/posts")
 async def post_a_post(post: Post, authorization: str | None = Header(default=None)):
@@ -71,8 +93,25 @@ async def post_a_post(post: Post, authorization: str | None = Header(default=Non
     logger.info(f"user : {authorization}")
 
 
-    # Doit retourner le résultat de la requête la table dynamodb
-    return res
+    if authorization is None:
+        return JSONResponse(
+            status_code=401,
+            content={"message": "Missing authorization header"},
+        )
+
+    post_id = f"POST#{uuid.uuid4()}"
+    user_key = f"USER#{authorization}"
+
+    item = {
+        "user": user_key,
+        "id": post_id,
+        "title": post.title,
+        "body": post.body
+    }
+
+    table.put_item(Item=item)
+
+    return item
 
 @app.get("/posts")
 async def get_all_posts(user: Union[str, None] = None):
@@ -81,12 +120,33 @@ async def get_all_posts(user: Union[str, None] = None):
     - Si un user est présent dans le requête, récupère uniquement les siens
     - Si aucun user n'est présent, récupère TOUS les postes de la table !!
     """
-    if user :
+    if user:
         logger.info(f"Récupération des postes de : {user}")
-    else :
+        response = table.scan()
+        items = [item for item in response.get("Items", []) if item.get("user") == f"USER#{user}"]
+    else:
         logger.info("Récupération de tous les postes")
-     # Doit retourner une liste de posts
-    return res[""]
+        response = table.scan()
+        items = response.get("Items", [])
+
+    # Ajout de l’URL pré-signée et du champ 'label' pour chaque post
+    for post in items:
+        if post.get("image"):
+            try:
+                url = create_presigned_url(bucket, post.get("image"))
+                post["image"] = url
+            except Exception as e:
+                logger.error(f"Erreur génération URL signée : {e}")
+                post["image"] = None
+        else:
+            post["image"] = None
+
+        # Ajout d’un champ label vide (peut être rempli plus tard)
+        if "label" not in post:
+            post["label"] = []
+        logger.info(f"Item après génération URL : {post}")
+
+    return items
 
     
 @app.delete("/posts/{post_id}")
