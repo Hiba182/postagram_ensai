@@ -73,7 +73,7 @@ function Post({ post, removePost, updatePost }) {
             <Col>
                 <Card style={{ marginTop: '1rem', }} key={post.id}>
                     <Card.Header >{post.title} <CloseButton className="float-end" onClick={deletePost} /></Card.Header>
-                    <Card.Img variant="top" src={post.image} />
+                    <Card.Img variant="top" src={post.image_url} />
                     <Card.Body>
                         <Card.Text>
                             {post.body}

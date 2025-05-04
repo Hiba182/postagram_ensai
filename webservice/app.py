@@ -113,6 +113,7 @@ async def post_a_post(post: Post, authorization: str | None = Header(default=Non
 
     return item
 
+
 @app.get("/posts")
 async def get_all_posts(user: Union[str, None] = None):
     """
@@ -134,18 +135,11 @@ async def get_all_posts(user: Union[str, None] = None):
         if post.get("image"):
             try:
                 url = create_presigned_url(bucket, post.get("image"))
-                post["image"] = url
+                post["image_url"] = url
             except Exception as e:
                 logger.error(f"Erreur génération URL signée : {e}")
-                post["image"] = None
-        else:
-            post["image"] = None
-
-        # Ajout d’un champ label vide (peut être rempli plus tard)
-        if "label" not in post:
-            post["label"] = []
-        logger.info(f"Item après génération URL : {post}")
-
+                post["image_url"] = None
+    
     return items
 
     

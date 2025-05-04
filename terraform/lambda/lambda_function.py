@@ -21,6 +21,8 @@ def lambda_handler(event, context):
     # Récupération de l'utilisateur et de l'UUID de la tâche
     try:
         user, post_id, _ = key.split('/')
+        user = f"USER#{user}"
+        post_id = f"POST#{post_id}"
     except ValueError:
         logger.error("Clé S3 invalide, attendu format : USER#hiba/POST#uuid/image.jpg")
         return {
